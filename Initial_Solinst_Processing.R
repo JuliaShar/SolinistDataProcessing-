@@ -79,7 +79,7 @@ formatted_master_compensated <- master_compensated_file_new %>%
 
 # ---- Remove Duplicate Timeseries ----
 # Flag any values where the same sensor:datetime has different values
-# if the data is the same, archive the dataframe from the "old" data processing period, then continue only with "new" period, not sure how to do this yet!!
+# if the data is the same, archive the dataframe from the "old" data processing period, then continue only with "new" period, not sure how to do this yet!!!!!!
 
 cleaned_data <- formatted_master_compensated %>%
   group_by(across(-end_date)) %>% # Group by the columns you want to check for duplicates
@@ -90,8 +90,21 @@ cleaned_data <- formatted_master_compensated %>%
 # should I remove data while the sensors are still equilibrating?
 # need to change date formatting
 
+
 # ---- QA/QC Flagging ----
 
 # flag if file name SN is different than SN in file
 # flag for 9999s or NaN
 # flag for above or below thresholds (need to determine these values)
+
+
+# ---- GW conversion ----
+# converting to actual water depth
+
+# ---- sp cond to psu ----
+# need to convert conductivity (us/cm) to practical salinity units using one of the R packages
+
+# ---- create relevant plots ----
+
+# ---- upload cleaned & processed data ----
+# need to decide where to store these files... Gdrive? GitHub?
