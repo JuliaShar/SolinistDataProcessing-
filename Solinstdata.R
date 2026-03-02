@@ -5,7 +5,7 @@ library(ggside)
 
 data <- read_csv("SolinstCloud V1.1.0 Project Report_All Data Table_Table - Sheet1.csv")
 
-data$SerialNumber <- as.character(data$SerialNumber)
+data$SerialNumber <- as.character(data$SerialNumber) 
 
 # Convert DateTime to POSIXct
 data$Time <- as.POSIXct(data$Time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")  # Adjust format as needed
