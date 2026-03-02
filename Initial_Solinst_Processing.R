@@ -3,6 +3,7 @@
 # Created on 20250115 by Opal Otenburg
 
 # ---- Load Libraries ----
+library(OGFLtools)
 library(tidyverse)
 library(hms)
 
@@ -100,11 +101,20 @@ cleaned_data <- formatted_master_compensated %>%
 
 # ---- GW conversion ----
 # converting to actual water depth
+# need to be separate by different sensors 
+data <- data %>% 
+  mutate(`levels<-`() = Compensated_Level - 1.8) # 1.8 in meters 
 
 # ---- sp cond to psu ----
 # need to convert conductivity (us/cm) to practical salinity units using one of the R packages
+df$salinity = ec_to_sal(df$temperature_c, df$condictivity_uscm)  
+
 
 # ---- create relevant plots ----
+# regional comparison plot of salinity (box or violin) 
+# time series of each sensor 
+# regional time series (each sensor is a different color) 
 
 # ---- upload cleaned & processed data ----
 # need to decide where to store these files... Gdrive? GitHub?
+
