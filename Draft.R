@@ -233,8 +233,14 @@ processed_df <- processed_df %>%
       (site %in% c("BW", "AF") & date >= as.Date("2025-08-28"))
   )
 
+#REMOVED ON-SITE READING CHANGES
 processed_df <- processed_df %>%
   filter(!date %in% c("2026-02-17", "2026-02-18"))
+
+#REMOVED DIP ON DEC 22nd
+processed_df <- processed_df  %>%
+  filter(site == "AF" & !date %in% c("2025-12-22")|
+        (site %in% c("BW", "WF")))
 
 # installed in december?? nov 20, 2025 (label is WF)
 #1094201 is actual blackwater
