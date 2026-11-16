@@ -22,65 +22,20 @@ run_length_flag <- function(x, interval_mins, flat_hours){
   rep(lengths_in_hours >= flat_hours, r$lengths)       # Return TRUE for each value in runs >= threshold
 }
 
+
+#ADD EDITS HERE 
 well_corrections <- tibble(
-  serial_number = c("1094201"),      # Serial number of the sensor
-  cable_correction = c(1.69)         # Correction value in meters
+  serial_number = c("1094201", "1094251", "1094252"),      # Serial number of the sensor
+  cable_correction = c(1.47, 1.8, 1.63),         # Correction value in meters
 )
 
-# Main QA/QC function that applies all quality checks to the dataset
-apply_qaqc <- function(df, expected_interval_mins, temp_min, temp_max, 
-                       level_min, level_max,
-                       temp_spike_thresh, level_spike_thresh,
-                       z_thresh, flatline_hours) {
-  
-  df <- df %>%
-    arrange(serial_number, date_time) %>%    # Sort by sensor and time to ensure chronological order
-    group_by(serial_number) %>%                  # Group by sensor so calculations are done per sensor
-    mutate(
-      time_diff_mins = as.numeric(difftime(date_time, lag(date_time), units = "mins")),
-      # Check if current timestamp is a duplicate of any previous timestamp
-      duplicate_time = duplicated(date_time),
-      # Flag if time gap exceeds expected interval by 50% (e.g., > 90 mins for 60-min interval)
-      gap_flag = time_diff_mins > expected_interval_mins * 1.5,
-      temp_range_flag  = temperature_c < temp_min | temperature_c > temp_max,
-     # cond_range_flag  = conductivity_uscm < cond_min | conductivity_uscm > cond_max,
-      level_range_flag = level_m < level_min | level_m > level_max,
-      d_temp  = temperature_c - lag(temperature_c),
-      #   d_cond  = conductivity_uscm - lag(conductivity_uscm),
-      d_level = level_m - lag(level_m),
-      temp_spike_flag  = abs(d_temp)  > temp_spike_thresh,
-     # cond_spike_flag  = abs(d_cond)  > cond_spike_thresh,
-      level_spike_flag = abs(d_level) > level_spike_thresh,
-      temp_z  = as.numeric(scale(temperature_c)),
-      #    cond_z  = as.numeric(scale(conductivity_uscm)),
-      level_z = as.numeric(scale(level_m)),
-      temp_z_flag  = abs(temp_z)  > z_thresh,
-      level_z_flag = abs(level_z) > z_thresh,
-      temp_flat_flag  = run_length_flag(temperature_c, expected_interval_mins, flatline_hours),
-      #cond_flat_flag  = run_length_flag(conductivity_uscm, expected_interval_mins, flatline_hours),
-      level_flat_flag = run_length_flag(level_m, expected_interval_mins, flatline_hours)
-    ) %>%
-    ungroup() %>%    # Remove grouping to apply overall flags
-    mutate(
-      qa_flag = case_when(
-        duplicate_time ~ "Duplicate Timestamp",                                    
-        gap_flag ~ "Time Gap",
-        temp_range_flag |  level_range_flag ~ "Range Exceedance",
-        temp_spike_flag | level_spike_flag ~ "Spike",
-        temp_z_flag | level_z_flag ~ "Statistical Outlier",
-        temp_flat_flag | level_flat_flag ~ "Flatline",
-        TRUE ~ "OK"                                                                
-      ),
-      # Assign numeric code for severity: 0=OK, 1=minor issue, 2=major issue
-      qa_code = case_when(
-        qa_flag == "OK" ~ 0,
-        qa_flag %in% c("Statistical Outlier","Time Gap") ~ 1,    # Minor flags
-        TRUE ~ 2                                                  # Major flags (duplicates, spikes, range, flatline)
-      )
-    )
-  
-  return(df)  # Return the data frame with all QA columns added
+ec_to_sal <- function(temperature, conductivity) {
+  salinity <- (0.5811 * conductivity) - 0.1296
+  return(salinity)
 }
+
+#1094201 is actual blackwater
+#1094251 is AF (abbends)
 
 expected_interval_mins <- 60   
 
@@ -106,6 +61,63 @@ z_thresh <- 3
 flatline_hours <- 24
 
 
+# Main QA/QC function that applies all quality checks to the dataset
+apply_qaqc <- function(df, expected_interval_mins, temp_min, temp_max, 
+                       cond_min, cond_max, level_min, level_max,
+                       temp_spike_thresh, cond_spike_thresh, level_spike_thresh,
+                       z_thresh, flatline_hours) {
+  
+  df <- df %>%
+    arrange(serial_number, date_time) %>%    # Sort by sensor and time to ensure chronological order
+    group_by(serial_number) %>%                  # Group by sensor so calculations are done per sensor
+    mutate(
+      time_diff_mins = as.numeric(difftime(date_time, lag(date_time), units = "mins")),
+      # Check if current timestamp is a duplicate of any previous timestamp
+      duplicate_time = duplicated(date_time),
+      # Flag if time gap exceeds expected interval by 50% (e.g., > 90 mins for 60-min interval)
+      gap_flag = time_diff_mins > expected_interval_mins * 1.5,
+      temp_range_flag  = temperature_c < temp_min | temperature_c > temp_max,
+      cond_range_flag  = conductivity_uscm < cond_min | conductivity_uscm > cond_max,
+      level_range_flag = level_m < level_min | level_m > level_max,
+      d_temp  = temperature_c - lag(temperature_c),
+      d_cond  = conductivity_uscm - lag(conductivity_uscm),
+      d_level = level_m - lag(level_m),
+      temp_spike_flag  = abs(d_temp)  > temp_spike_thresh,
+      cond_spike_flag  = abs(d_cond)  > cond_spike_thresh,
+      level_spike_flag = abs(d_level) > level_spike_thresh,
+      temp_z  = as.numeric(scale(temperature_c)),
+      cond_z  = as.numeric(scale(conductivity_uscm)),
+      level_z = as.numeric(scale(level_m)),
+      temp_z_flag  = abs(temp_z)  > z_thresh,
+      cond_z_flag  = abs(cond_z)  > z_thresh,
+      level_z_flag = abs(level_z) > z_thresh,
+      temp_flat_flag  = run_length_flag(temperature_c, expected_interval_mins, flatline_hours),
+      cond_flat_flag  = run_length_flag(conductivity_uscm, expected_interval_mins, flatline_hours),
+      level_flat_flag = run_length_flag(level_m, expected_interval_mins, flatline_hours)
+    ) %>%
+    ungroup() %>%    # Remove grouping to apply overall flags
+    mutate(
+      qa_flag = case_when(
+        duplicate_time ~ "Duplicate Timestamp",                                    
+        gap_flag ~ "Time Gap",
+        temp_range_flag | cond_range_flag | level_range_flag ~ "Range Exceedance",
+        temp_spike_flag | cond_spike_flag | level_spike_flag ~ "Spike",
+        temp_z_flag | cond_z_flag | level_z_flag ~ "Statistical Outlier",
+        temp_flat_flag | cond_flat_flag | level_flat_flag ~ "Flatline",
+        TRUE ~ "OK"                                                                
+      ),
+      # Assign numeric code for severity: 0=OK, 1=minor issue, 2=major issue
+      qa_code = case_when(
+        qa_flag == "OK" ~ 0,
+        qa_flag %in% c("Statistical Outlier","Time Gap") ~ 1,    # Minor flags
+        TRUE ~ 2                                                  # Major flags (duplicates, spikes, range, flatline)
+      )
+    )
+  
+  return(df)  # Return the data frame with all QA columns added
+}
+
+
 #intake of data from google drive
 drive_auth()
 
@@ -124,14 +136,12 @@ head(all_data)
 
 #rename
 df <- all_data %>%
-  mutate(
-    # Ensure SerialNumber is character
-    serial_number = as.character('SerialNumber')) %>% 
+  mutate(serial_number = as.character(`Serial Number`)) %>% 
   # Rename columns as desired
   rename(
-  #  conductivity_uscm = 'Level',                       !!!! there is no conductivty in the file?
+    conductivity_uscm = 'Conductivity',
     temperature_c = 'Temperature',
-    level_m = 'Level'
+    level_m = 'Compensated Level'
   )
 
 
@@ -147,11 +157,14 @@ processed_df <- apply_qaqc(
   df,                # Input dataframe
   expected_interval_mins,     # All the threshold parameters defined earlier
   temp_min, temp_max,
+  cond_min, cond_max,
   level_min, level_max,
-  temp_spike_thresh, level_spike_thresh,
+  temp_spike_thresh, cond_spike_thresh, level_spike_thresh,
   z_thresh, flatline_hours
 )
 
+processed_df <- processed_df %>%
+  mutate(salinity = ec_to_sal(temperature_c, conductivity_uscm))
 
 # CORRECT GW LEVEL BY WELL 
 processed_df <- processed_df %>%
@@ -164,30 +177,22 @@ processed_df <- processed_df %>%
     )
   )
 
+site <- tibble(
+  serial_number = c("1094201", "1094251", "1094252"),      # Serial number of the sensor
+  site = c("BW", "AF", "WF"),         # Correction value in meters
+)
 
-#SPLIT BY LOCATION?
-blackwater <- processed_df %>% filter(Location == "Blackwater")
-other <- processed_df %>% filter(is.na((Location)))
+processed_df <- processed_df %>%
+  left_join(site, by = "serial_number")
 
+
+#NEED DATE CORRECTION
 
 
 #PLOTS
-ggplot(processed_df, aes(x = date_time, y = temperature_c, color = factor(`Serial Number`))) +
+ggplot(processed_df, aes(x = date_time, y = temperature_c, color = factor(`site`))) +
   geom_line() +
   labs(x = "Date", y = "Temperature (°C)", title = "Temperature") +
-  theme_bw()
-
-
-
-ggplot(blackwater, aes(x = date_time, y = temperature_c, color = factor(`Serial Number`))) +
-  geom_line() +
-  labs(x = "Date", y = "Temperature (°C)", color = "Logger", title = "Temperature in Blackwater") +
-  theme_bw()
-
-
-ggplot(other, aes(x = date_time, y = temperature_c)) +
-  geom_line() +
-  labs(x = "Date", y = "Temperature (°C)", title = "Temperature for Sensor") +
   theme_bw()
 
 # installed in december?? nov 20, 2025 (label is WF)
@@ -195,15 +200,11 @@ ggplot(other, aes(x = date_time, y = temperature_c)) +
 #1094251 is AF (abbends)
 
 #water level 
-ggplot(processed_df, aes(x = date_time, y = level_m, color = factor(`Serial Number`))) +
+ggplot(processed_df, aes(x = date_time, y = level_m, color = factor(`site`))) +
   geom_line() +
   labs(x = "Date", y = "Level (m)", title = "Level")
 
-ggplot(blackwater, aes(x = date_time, y = level_m, color = factor(`Serial Number`))) +
-  geom_line() +
-  labs(x = "Date", y = "Level (m)", color = "Logger", title = "Level in Blackwater")
 
-
-ggplot(other, aes(x = date_time, y = level_m)) +
+ggplot(processed_df, aes(x = date_time, y = salinity, color = factor(`site`))) +
   geom_line() +
-  labs(x = "Date", y = "Level (m)", title = "Level by Sensor")
+  labs(x = "Date", y = "Level (m)", title = "Salinity")
