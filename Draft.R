@@ -121,7 +121,7 @@ apply_qaqc <- function(df, expected_interval_mins, temp_min, temp_max,
 #intake of data from google drive
 drive_auth()
 
-folder <- drive_get("Solinist")
+folder <- drive_get("Maryland")
 
 all_csv <- drive_ls(folder, type = "csv")
 
@@ -186,25 +186,53 @@ processed_df <- processed_df %>%
   left_join(site, by = "serial_number")
 
 
-#NEED DATE CORRECTION
-
-
-#PLOTS
-ggplot(processed_df, aes(x = date_time, y = temperature_c, color = factor(`site`))) +
-  geom_line() +
-  labs(x = "Date", y = "Temperature (°C)", title = "Temperature") +
-  theme_bw()
+#Date Correction
+processed_df <- processed_df %>%
+  mutate(date = as.Date(date)) %>%
+  filter(
+    (site == "WF" & date > as.Date("2025-11-20")) |
+      (site %in% c("BW", "AF") & date >= as.Date("2025-08-22"))
+  )
 
 # installed in december?? nov 20, 2025 (label is WF)
 #1094201 is actual blackwater
 #1094251 is AF (abbends)
 
-#water level 
-ggplot(processed_df, aes(x = date_time, y = level_m, color = factor(`site`))) +
+#Time Series
+ggplot(processed_df, aes(x = date, y = temperature_c, color = factor(`site`))) +
+  geom_line() +
+  labs(x = "Date", y = "Temperature (°C)", title = "Temperature") +
+  theme_bw()
+
+
+ggplot(processed_df, aes(x = date, y = corrected_level, color = factor(`site`))) +
   geom_line() +
   labs(x = "Date", y = "Level (m)", title = "Level")
 
 
-ggplot(processed_df, aes(x = date_time, y = salinity, color = factor(`site`))) +
+ggplot(processed_df, aes(x = date, y = salinity, color = factor(`site`))) +
   geom_line() +
   labs(x = "Date", y = "Level (m)", title = "Salinity")
+
+
+#Box Plot
+ggplot(processed_df, aes(x = site, y = temperature_c, fill = site)) +
+  geom_boxplot() +
+  labs(title = "Temperature",
+       x = "Site",
+       y = "Temp") +
+  theme_bw()
+
+ggplot(processed_df, aes(x = site, y = corrected_level, fill = site)) +
+  geom_boxplot() +
+  labs(title = "Water Level",
+       x = "Site",
+       y = "Level") +
+  theme_bw()
+
+ggplot(processed_df, aes(x = site, y = salinity, fill = site)) +
+  geom_boxplot() +
+  labs(title = "Salinity",
+       x = "Site",
+       y = "Salinity") +
+  theme_bw()
