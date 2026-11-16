@@ -163,6 +163,45 @@ processed_df <- apply_qaqc(
   z_thresh, flatline_hours
 )
 
+
+
+# Overall summary across all sensors
+overall_qa_summary <- processed_df %>%
+  count(qa_flag) %>%                                    # Count occurrences of each flag type
+  mutate(percent = round(n / sum(n) * 100, 2)) %>%     # Calculate percentage
+  arrange(desc(n))                                      # Sort by most common first
+
+# Print overall summary to console
+print("=== OVERALL QA SUMMARY ===")
+print(overall_qa_summary)
+cat("\nTotal records:", nrow(processed_df), "\n")
+cat("Percent flagged (not OK):",
+    round(sum(processed_df$qa_flag != "OK") / nrow(processed_df) * 100, 2), "%\n\n")
+
+# Summary broken down by individual sensor
+sensor_qa_summary <- processed_df %>%
+  group_by(serial_number, qa_flag) %>%                  # Group by sensor and flag type
+  summarise(n = n(), .groups = "drop_last") %>%        # Count within each group
+  mutate(percent = round(n / sum(n) * 100, 2)) %>%     # Calculate percentage within each sensor
+  arrange(serial_number, desc(n))                       # Sort by sensor, then by count
+
+# Print sensor-specific summary to console
+print("=== QA SUMMARY BY SENSOR ===")
+print(sensor_qa_summary)
+
+# Create output directory for saving plots
+# showWarnings = FALSE prevents error if directory already exists
+dir.create("qc_plots", showWarnings = FALSE)
+
+# 1. QA Flags by Sensor - Stacked bar chart showing flag distribution
+ggplot(processed_df, aes(x = serial_number, fill = qa_flag)) +
+  geom_bar(position = "fill") +                        # Stacked bar chart (proportions sum to 1)
+  scale_y_continuous(labels = scales::percent) +       # Format y-axis as percentages
+  coord_flip()                                 # Flip to horizontal bars for readability
+  
+
+
+#CONVERT TO SALINITY
 processed_df <- processed_df %>%
   mutate(salinity = ec_to_sal(temperature_c, conductivity_uscm))
 
@@ -191,12 +230,17 @@ processed_df <- processed_df %>%
   mutate(date = as.Date(date)) %>%
   filter(
     (site == "WF" & date > as.Date("2025-11-20")) |
-      (site %in% c("BW", "AF") & date >= as.Date("2025-08-22"))
+      (site %in% c("BW", "AF") & date >= as.Date("2025-08-28"))
   )
+
+processed_df <- processed_df %>%
+  filter(!date %in% c("2026-02-17", "2026-02-18"))
 
 # installed in december?? nov 20, 2025 (label is WF)
 #1094201 is actual blackwater
 #1094251 is AF (abbends)
+
+#remove feb 18/19 readings, those were days 
 
 #Time Series
 ggplot(processed_df, aes(x = date, y = temperature_c, color = factor(`site`))) +
